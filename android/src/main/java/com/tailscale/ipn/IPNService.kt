@@ -161,8 +161,11 @@ open class IPNService : VpnService(), libtailscale.IPNService {
     b.setUnderlyingNetworks(null) // Use all available networks.
 
     val includedPackages: List<String> =
-        MDMSettings.includedPackages.flow.value.value?.split(",")?.map { it.trim() } ?: emptyList()
+      (MDMSettings.includedPackages.flow.value.value?.split(",")?.map { it.trim() } ?: emptyList()) +
+      UninitializedApp.get().disallowedPackageNames()
+
     if (includedPackages.isNotEmpty()) {
+      b.addAllowedApplication("com.tailscale.ipn")
       // If an admin defined a list of packages that are exclusively allowed to be used via
       // Tailscale,
       // then only allow those apps.
@@ -174,7 +177,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
       // Otherwise, prevent certain apps from getting their traffic + DNS routed via Tailscale:
       // - any app that the user manually disallowed in the GUI
       // - any app that we disallowed via hard-coding
-      for (disallowedPackageName in UninitializedApp.get().disallowedPackageNames()) {
+      for (disallowedPackageName in UninitializedApp.get().actualDisallowedPackageNames()) {
         TSLog.d(TAG, "Disallowing app: $disallowedPackageName")
         disallowApp(b, disallowedPackageName)
       }
