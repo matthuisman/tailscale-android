@@ -33,5 +33,10 @@ jobs:
       - name: Build APKs
         run: make tailscale-debug.apk
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tailscale-debug.apk
+          path: tailscale-debug.apk
+
       - name: Run tests
         run: make test
