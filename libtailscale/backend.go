@@ -266,7 +266,7 @@ func (a *App) runBackendOnce(ctx context.Context) error {
 func (a *App) newBackend(dataDir string, appCtx AppContext, store *stateStore,
 	settings settingsFunc) (*backend, error) {
 
-	sys := new(tsd.System)
+	sys := tsd.NewSystem()
 	sys.Set(store)
 
 	logf := logger.RusagePrefixLog(log.Printf)
@@ -317,6 +317,7 @@ func (a *App) newBackend(dataDir string, appCtx AppContext, store *stateStore,
 		HealthTracker:  sys.HealthTracker(),
 		Metrics:        sys.UserMetricsRegistry(),
 		DriveForLocal:  driveimpl.NewFileSystemForLocal(logf),
+		EventBus:       sys.Bus.Get(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("runBackend: NewUserspaceEngine: %v", err)

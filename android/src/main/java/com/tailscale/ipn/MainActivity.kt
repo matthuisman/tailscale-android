@@ -49,6 +49,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.tailscale.ipn.mdm.MDMSettings
+import com.tailscale.ipn.mdm.ShowHide
 import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.ui.theme.AppTheme
@@ -133,6 +134,14 @@ class MainActivity : ComponentActivity() {
     App.get()
     vpnViewModel = ViewModelProvider(App.get()).get(VpnViewModel::class.java)
 
+    val rm = getSystemService(Context.RESTRICTIONS_SERVICE) as RestrictionsManager
+    MDMSettings.update(App.get(), rm)
+
+    if (MDMSettings.onboardingFlow.flow.value.value == ShowHide.Hide ||
+        MDMSettings.authKey.flow.value.value != null) {
+      setIntroScreenViewed(true)
+    }
+
     // (jonathan) TODO: Force the app to be portrait on small screens until we have
     // proper landscape layout support
     if (!isLandscapeCapable()) {
@@ -154,6 +163,15 @@ class MainActivity : ComponentActivity() {
             } else {
               TSLog.d("VpnPermission", "Permission was denied by the user")
               vpnViewModel.setVpnPrepared(false)
+
+              AlertDialog.Builder(this)
+                  .setTitle(R.string.vpn_permission_needed)
+                  .setMessage(R.string.vpn_explainer)
+                  .setPositiveButton(R.string.try_again) { _, _ ->
+                    viewModel.showVPNPermissionLauncherIfUnauthorized()
+                  }
+                  .setNegativeButton(R.string.cancel, null)
+                  .show()
             }
           }
         }
@@ -354,9 +372,7 @@ class MainActivity : ComponentActivity() {
                         onNavigateHome = backTo("main"), backTo("userSwitcher"))
                   }
                 }
-
-            // Show the intro screen one time
-            if (!introScreenViewed()) {
+            if (isIntroScreenViewedSet()) {
               navController.navigate("intro")
               setIntroScreenViewed(true)
             }
@@ -494,10 +510,6 @@ class MainActivity : ComponentActivity() {
     lifecycleScope.launch(Dispatchers.IO) { MDMSettings.update(App.get(), restrictionsManager) }
   }
 
-  override fun onStart() {
-    super.onStart()
-  }
-
   override fun onStop() {
     super.onStop()
     val restrictionsManager =
@@ -514,8 +526,8 @@ class MainActivity : ComponentActivity() {
     startActivity(intent)
   }
 
-  private fun introScreenViewed(): Boolean {
-    return getSharedPreferences("introScreen", Context.MODE_PRIVATE).getBoolean("seen", false)
+  private fun isIntroScreenViewedSet(): Boolean {
+    return !getSharedPreferences("introScreen", Context.MODE_PRIVATE).getBoolean("seen", false)
   }
 
   private fun setIntroScreenViewed(seen: Boolean) {

@@ -126,6 +126,13 @@ class MainViewModel(private val vpnViewModel: VpnViewModel) : IpnViewModel() {
     this.pingViewModel.handleDismissal()
   }
 
+  // Returns true if we should skip all of the user-interactive permissions prompts
+  // (with the exception of the VPN permission prompt)
+  fun skipPromptsForAuthKeyLogin(): Boolean {
+    val v = MDMSettings.authKey.flow.value.value
+    return v != null && v != ""
+  }
+
   private val peerCategorizer = PeerCategorizer()
 
   init {
@@ -203,6 +210,7 @@ class MainViewModel(private val vpnViewModel: VpnViewModel) : IpnViewModel() {
 
   fun showVPNPermissionLauncherIfUnauthorized() {
     val vpnIntent = VpnService.prepare(App.get())
+    TSLog.d("VpnPermissions", "vpnIntent=$vpnIntent")
     if (vpnIntent != null) {
       vpnPermissionLauncher?.launch(vpnIntent)
     } else {
@@ -218,6 +226,10 @@ class MainViewModel(private val vpnViewModel: VpnViewModel) : IpnViewModel() {
   }
 
   fun checkIfTaildropDirectorySelected() {
+    if (skipPromptsForAuthKeyLogin()) {
+      return
+    }
+
     val app = App.get()
     val storedUri = app.getStoredDirectoryUri()
     if (storedUri == null) {

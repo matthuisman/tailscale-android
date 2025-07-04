@@ -10,6 +10,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.RestrictionsManager
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
@@ -48,7 +49,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import libtailscale.Libtailscale
-import java.io.File
 import java.io.IOException
 import java.net.NetworkInterface
 import java.security.GeneralSecurityException
@@ -157,13 +157,16 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
     if (storedUri != null && storedUri.toString().startsWith("content://")) {
       startLibtailscale(storedUri.toString())
     } else {
-      startLibtailscale(this.getFilesDir().absolutePath)
+      startLibtailscale(this.filesDir.absolutePath)
     }
     healthNotifier = HealthNotifier(Notifier.health, Notifier.state, applicationScope)
     connectivityManager = this.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     NetworkChangeCallback.monitorDnsChanges(connectivityManager, dns)
     initViewModels()
     applicationScope.launch {
+      val rm = getSystemService(Context.RESTRICTIONS_SERVICE) as RestrictionsManager
+      MDMSettings.update(get(), rm)
+
       Notifier.state.collect { _ ->
         combine(Notifier.state, MDMSettings.forceEnabled.flow, Notifier.prefs, Notifier.netmap) {
                 state,
@@ -243,6 +246,16 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
   @Throws(IOException::class, GeneralSecurityException::class)
   override fun decryptFromPref(prefKey: String?): String? {
     return getEncryptedPrefs().getString(prefKey, null)
+  }
+
+  override fun getStateStoreKeysJSON(): String {
+    val prefix = "statestore-"
+    val keys = getEncryptedPrefs()
+                  .getAll()
+                  .keys
+                  .filter { it.startsWith(prefix) }
+                  .map   { it.removePrefix(prefix) }
+    return org.json.JSONArray(keys).toString()
   }
 
   @Throws(IOException::class, GeneralSecurityException::class)
